@@ -99,6 +99,64 @@
   #splash.fade-out{ opacity:0; visibility:hidden; pointer-events:none; }
   .splash-crack{ position:absolute; inset:0; opacity:.25; }
 
+
+  /* ---------- welcome / location consent modal ---------- */
+  #location-welcome{
+    position:fixed; inset:0; z-index:1000;
+    display:flex; align-items:center; justify-content:center;
+    padding:20px;
+    background:rgba(9,9,11,.58);
+    backdrop-filter:blur(7px);
+    opacity:0; visibility:hidden; pointer-events:none;
+    transition:opacity .25s ease, visibility .25s ease;
+  }
+  #location-welcome.open{
+    opacity:1; visibility:visible; pointer-events:auto;
+  }
+  .location-card{
+    width:min(430px, 100%);
+    background:#fff; color:var(--ink);
+    border:2px solid var(--ink);
+    box-shadow:14px 14px 0 var(--accent);
+    padding:28px;
+    text-align:center;
+  }
+  .location-card h2{
+    font-family:'Anton',sans-serif;
+    font-size:clamp(2rem,8vw,3rem);
+    line-height:1;
+    margin:0 0 10px;
+  }
+  .location-card p{
+    margin:0 auto 20px;
+    max-width:34rem;
+    color:#52525B;
+    font-size:14px;
+    line-height:1.6;
+  }
+  #location-thanks{
+    width:100%;
+    min-height:48px;
+    border:2px solid var(--ink);
+    background:var(--accent);
+    color:var(--ink);
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    cursor:pointer;
+    transition:transform .15s ease, background .15s ease;
+  }
+  #location-thanks:hover{ transform:translate(-2px,-2px); background:var(--accent-hover); }
+  #location-status{
+    min-height:20px;
+    margin-top:12px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:#71717A;
+  }
+  @media (max-width:480px){
+    .location-card{ padding:22px; box-shadow:8px 8px 0 var(--accent); }
+  }
+
   /* ---------- nav search ---------- */
   #search-suggestions{
     position:absolute; top:calc(100% + 8px); left:0; right:0;
@@ -136,13 +194,6 @@
   .btn-add:hover{ background:var(--steel); color:#fff; }
   .btn-buy{ background:var(--accent); color:var(--steel); }
   .btn-buy:hover{ background:var(--accent-dark); }
-
-  /* Disable splash screen on phones */
-@media (max-width: 768px) {
-  #splash {
-    display: none !important;
-  }
-}
 
  @media (max-width: 768px) {
   /* Override JS inline 100vh styles on hero/slider containers */
@@ -235,6 +286,21 @@
   </div>
 </div>
 
+<!-- ============ LOCATION WELCOME ============ -->
+<div id="location-welcome" aria-hidden="true">
+  <div class="location-card" role="dialog" aria-modal="true" aria-labelledby="location-title">
+    <p class="f-mono" style="letter-spacing:.2em;text-transform:uppercase;font-size:11px;margin-bottom:8px;">SUB—ZERO</p>
+    <h2 id="location-title">WELCOME</h2>
+    <p>
+      Welcome to SUB—ZERO. Tap <strong>Thanks</strong> to continue.
+      We’ll then ask for permission to use your approximate device location
+      to improve the experience. Your browser controls the permission request.
+    </p>
+    <button id="location-thanks" type="button">THANKS</button>
+    <div id="location-status" aria-live="polite"></div>
+  </div>
+</div>
+
 <!-- ============ CART OVERLAY + DRAWER ============ -->
 <div id="cart-overlay" onclick="closeCart()"></div>
 <aside id="cart-drawer">
@@ -320,7 +386,7 @@
       <i class="fa-solid fa-key absolute text-[26rem] text-white/5 right-0 top-0 rotate-12"></i>
     </div>
     <div class="hero-slide flex items-center justify-center" style="background:radial-gradient(circle at 70% 60%, #2e3a2f, #10141A 65%);">
-      <img src="14.png" alt="Hero Banner" class="w-full h-full object-cover">
+      <img src="11.png" alt="Hero Banner" class="w-full h-full object-cover">
       <i class="fa-solid fa-wallet absolute text-[26rem] text-white/5 -right-10 bottom-0"></i>
     </div>
 
@@ -823,16 +889,89 @@ function toggleMobileMenu(){
 })();
 
 /* ===================================================================
-   SPLASH
+   SPLASH + LOCATION CONSENT
 =================================================================== */
-window.onload = function(){
+window.addEventListener("load", () => {
   const splash = document.getElementById("splash");
-  if(splash){
+  const welcome = document.getElementById("location-welcome");
+  const thanks = document.getElementById("location-thanks");
+  const status = document.getElementById("location-status");
+
+  // Keep the existing branded splash briefly, then show the consent popup.
+  if (splash) {
     splash.classList.add("fade-out");
-    setTimeout(()=> splash.remove(), 650);
+    setTimeout(() => splash.remove(), 650);
   }
+
+  setTimeout(() => {
+    if (!welcome) return;
+    welcome.classList.add("open");
+    welcome.setAttribute("aria-hidden", "false");
+    thanks?.focus();
+  }, 700);
+
+  thanks?.addEventListener("click", () => {
+    if (!navigator.geolocation) {
+      status.textContent = "Location is not supported by this browser.";
+      return;
+    }
+
+    thanks.disabled = true;
+    thanks.textContent = "REQUESTING LOCATION…";
+    status.textContent = "Please allow location access in your browser.";
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const location = {
+          latitude: Number(position.coords.latitude.toFixed(6)),
+          longitude: Number(position.coords.longitude.toFixed(6)),
+          accuracy_meters: Math.round(position.coords.accuracy),
+          timestamp: new Date().toISOString()
+        };
+
+        try {
+          // GitHub Pages cannot write to your repository directly.
+          // Point this URL to your serverless endpoint (see the companion
+          // location-worker.js file) before publishing.
+          const response = await fetch("/api/location", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(location)
+          });
+
+          if (!response.ok) throw new Error("Location endpoint returned an error.");
+
+          status.textContent = "Thanks — location received.";
+        } catch (error) {
+          console.error(error);
+          status.textContent = "Location permission granted, but saving is not configured yet.";
+        } finally {
+          setTimeout(() => {
+            welcome.classList.remove("open");
+            welcome.setAttribute("aria-hidden", "true");
+          }, 900);
+        }
+      },
+      (error) => {
+        const messages = {
+          1: "Location permission was denied.",
+          2: "Your location could not be determined.",
+          3: "The location request timed out."
+        };
+        status.textContent = messages[error.code] || "Unable to get your location.";
+        thanks.disabled = false;
+        thanks.textContent = "TRY AGAIN";
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 300000
+      }
+    );
+  });
+
   updateCartBadge();
-};
+});
 
 /* ===================================================================
    INIT
