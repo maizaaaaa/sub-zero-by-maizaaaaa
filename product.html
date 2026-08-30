@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SUB—ZERO | Armor Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+:root {
+  --bg-main: #FFFFFF;
+  --bg-subtle: #F4F4F5;
+  --bg-surface: #FAFAFA;
+  --ink: #09090B;
+  --ink-muted: #71717A;
+  --accent: #FF5500;
+  --accent-hover: #E04B00;
+  --border: #E4E4E7;
+  --border-dark: #09090B;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-main);
+  color: var(--ink);
+}
+
+.f-display { font-family: 'Anton', sans-serif; }
+.f-mono { font-family: 'JetBrains Mono', monospace; }
+
+.product-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+.product-card:hover { 
+  transform: translateY(-4px); 
+  border-color: var(--border-dark);
+}
+
+.btn-buy { background: var(--accent); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; }
+.btn-buy:hover { background: var(--accent-hover); }
+
+.btn-add { 
+  border: 1.5px solid var(--ink); 
+  color: var(--ink); 
+  background: transparent; 
+}
+.btn-add:hover { 
+  background: var(--ink); 
+  color: #fff; 
+}
+
+/* Modal HUD Frame Styling */
+.hud-frame { position: relative; }
+.hud-frame::before, .hud-frame::after {
+  content: ''; position: absolute; width: 16px; height: 16px;
+  border-style: solid; border-color: var(--accent); border-width: 0;
+  pointer-events: none;
+}
+.hud-frame::before { top: -1px; left: -1px; border-top-width: 3px; border-left-width: 3px; }
+.hud-frame::after { bottom: -1px; right: -1px; border-bottom-width: 3px; border-right-width: 3px; }
+
+/* Modal Display */
+#product-modal.hidden { display: none; }
+
+/* Cart Drawer */
+#cart-overlay { position: fixed; inset: 0; background: rgba(9,9,11,0.6); backdrop-filter: blur(2px); z-index: 60; display: none; }
+#cart-drawer {
+  position: fixed; top: 0; right: 0; height: 100%; width: min(400px, 90vw);
+  background: var(--bg-main); border-left: 1px solid var(--border-dark); z-index: 70;
+  transform: translateX(100%); transition: transform 0.3s ease-in-out;
+  display: flex; flex-direction: column;
+}
+#cart-drawer.open { transform: translateX(0); }
+</style>
+</head>
+<body class="pt-24 pb-16">
+
+<!-- NAVBAR -->
+<nav class="fixed top-0 left-0 right-0 z-40 bg-[var(--bg-main)] border-b border-[var(--border)]">
+  <div class="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between gap-4">
+    <a href="index.html" class="f-display text-2xl text-[var(--ink)]">SUB<span class="text-[var(--accent)]">—</span>ZERO</a>
+    
+    <!-- CART BUTTON TRIGGER -->
+    <button id="cart-btn" onclick="toggleCart(true)" class="relative bg-[var(--bg-subtle)] border border-[var(--border-dark)] px-4 py-2 f-mono text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-[var(--ink)] hover:text-white transition-colors">
+      <i class="fa-solid fa-cart-shopping"></i>
+      <span>Cart</span>
+      <span id="cart-badge" class="bg-[var(--accent)] text-[var(--ink)] px-1.5 py-0.5 text-[10px] font-bold rounded-full">0</span>
+    </button>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT CONTAINER -->
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <div class="mb-8">
+    <h1 class="f-display text-4xl uppercase">Catalog</h1>
+    <p class="f-mono text-xs text-[var(--ink-muted)] mt-1">Select an item to inspect or add to your order manifest.</p>
+  </div>
+
+  <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+</main>
+
+<!-- PRODUCT DETAIL MODAL -->
+<div id="product-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div class="relative w-full max-w-3xl bg-[var(--bg-main)] border border-[var(--border-dark)] shadow-2xl hud-frame p-6 sm:p-8">
+    <button onclick="closeModal()" class="absolute top-4 right-4 text-[var(--ink-muted)] hover:text-[var(--accent)] text-2xl font-bold transition-colors">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+      <div class="aspect-square bg-[var(--bg-subtle)] border border-[var(--border)] flex items-center justify-center relative">
+        <img id="modal-product-img" src="" alt="Product Image" class="w-full h-full object-cover">
+        <span id="modal-category-badge" class="absolute top-3 left-3 bg-[var(--ink)] text-white text-[10px] f-mono font-bold px-2 py-1 uppercase tracking-widest">CAT</span>
+      </div>
+
+      <div class="flex flex-col justify-between h-full">
+        <div>
+          <span class="f-mono text-xs text-[var(--accent)] font-bold uppercase tracking-wider">SPECIFICATION SHEET</span>
+          <h2 id="modal-product-name" class="f-display text-3xl sm:text-4xl uppercase mt-1 leading-none">PRODUCT NAME</h2>
+          <p id="modal-product-price" class="f-mono text-2xl font-bold text-[var(--ink)] mt-3">Rs. 0.00</p>
+          <div class="border-t border-[var(--border)] my-4"></div>
+          <p id="modal-product-desc" class="text-sm text-[var(--ink-muted)] leading-relaxed">Product description details.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-8">
+          <button id="modal-add-cart" class="btn-add py-3 px-4 text-xs f-mono font-bold uppercase tracking-wider transition-colors">
+            Add to Cart
+          </button>
+          <button id="modal-buy-now" class="btn-buy py-3 px-4 text-xs f-mono font-bold uppercase tracking-wider transition-colors text-center">
+            Buy Now
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CART DRAWER & OVERLAY -->
+<div id="cart-overlay" onclick="toggleCart(false)"></div>
+<aside id="cart-drawer">
+  <div class="p-6 border-b border-[var(--border)] flex items-center justify-between">
+    <h3 class="f-display text-2xl uppercase">Your Cart</h3>
+    <button onclick="toggleCart(false)" class="text-xl text-[var(--ink-muted)] hover:text-[var(--accent)]"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
+  <div id="cart-items-container" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
+
+  <div class="p-6 border-t border-[var(--border)] bg-[var(--bg-surface)]">
+    <div class="flex justify-between items-baseline mb-4 f-mono">
+      <span class="text-xs uppercase text-[var(--ink-muted)]">Subtotal</span>
+      <span id="cart-subtotal" class="f-display text-2xl">Rs. 0.00</span>
+    </div>
+    <a href="checkout.html" class="block w-full btn-buy py-3.5 text-center text-xs f-mono font-bold uppercase tracking-widest">
+      Proceed to Checkout <i class="fa-solid fa-arrow-right ml-1"></i>
+    </a>
+  </div>
+</aside>
+
+<script>
+var PRODUCTS = [
+ 
+  { id: 'black-lace-choker-with-pendant-for-women',
+   name: 'Black Lace Choker with Pendant for Women', 
+   category: 'Necklaces', 
+   price: 400.00, icon: 'fa-cubes', 
+   desc: 'Made with high-quality black lace for a luxurious feel', 
+   image: '15.png' },
+  { id: 'double-layer-pearl-gold-plated-necklace-for-women-40cm', 
+  name: 'Double Layer Pearl & Gold Plated Necklace for Women 40cm', 
+  category: 'Necklaces', price: 600.00, icon: 'fa-cubes', 
+  desc: 'Elegant Double Layer Pearl Pendant Necklace for Women Add timeless elegance to your style with this beautiful double-layer necklace featuring delicate pearl beads and a charming pearl drop pendant.',
+   image: '16.png' },
+  { id: 'korean-butterfly-necklace-gold-silver-alloy-daily-wear',
+   name: 'Korean Butterfly Necklace Gold Silver Alloy Daily Wear',
+    category: 'Necklaces', price: 450.00, icon: 'fa-cubes', 
+    desc: 'Premium Quality alloy material for long-lasting shine',
+     image: '17.png' },
+  { id: 'silver-butterfly-choker-necklace-adjustable-for-women', 
+  name: 'Silver Butterfly Choker Necklace Adjustable for Women',
+  category: 'Necklaces', price: 500.00, icon: 'fa-cubes',
+   desc: 'Perfect for everyday wear or special occasions',
+    image: '18.png' },
+  { id: 'golden-butterfly-chain-necklace-adjustable-gold-plated', 
+  name: 'Golden Butterfly Chain Necklace Adjustable Gold Plated', 
+  category: 'Necklaces', price: 500.00, icon: 'fa-cubes',
+   desc: 'Lightweight and comfortable for daily use', 
+   image: '19.png' },
+  { id: 'black-vertical-bar-necklace-stainless-steel-unisex',
+   name: 'Black Vertical Bar Necklace Stainless Steel Unisex',
+   category: 'Necklaces', price: 350.00, icon: 'fa-cubes',
+    desc: 'Premium quality stainless steel construction for long-lasting wear',
+     image: '20.png' },
+  { id: 'stainless-steel-black-hand-chain-bracelet-for-men-women',
+   name: 'Stainless Steel Black Hand Chain Bracelet for Men Women',
+    category: 'Bracelets', price: 1799.00, icon: 'fa-cubes',
+     desc: 'Stainless steel hand chain for men and women.', 
+     image: '21.png' },
+  { id: 'premium-leather-magnetic-bracelet-for-men-multi-color-durable-stylish',
+   name: 'Premium Leather Magnetic Bracelet for Men, Multi Color, Durable & Stylish',
+    category: 'Bracelets', price: 1299.00, icon: 'fa-cubes',
+     desc: 'urable hand-woven leather construction for long-lasting wear',
+      image: '22.png' },
+  { id: 'black-leather-braided-bracelet-with-silver-studs-for-men',
+   name: 'Black Leather Braided Bracelet with Silver Studs for Men',
+    category: 'Bracelets', price: 1100.00, icon: 'fa-cubes',
+    desc: 'Black cowhide leather construction for durability',
+     image: '23.png' },
+  { id: 'retro-owl-bracelet-brown-leather-adjustable-for-women',
+   name: 'Retro Owl Bracelet Brown Leather Adjustable for Women',
+    category: 'Bracelets', price: 700.00, icon: 'fa-cubes', 
+    desc: 'Made with premium quality cowhide leather for durability',
+     image: '24.png' },
+  { id: 'vintage-brass-compass-watch-for-men-women-brown-leather-strap',
+   name: 'Vintage Brass Compass Watch for Men Women Brown Leather Strap',
+    category: 'Watches', price: 1500.00, icon: 'fa-cubes',
+     desc: 'Thick brown leather strap for durability and comfort', 
+     image: '25.png' },
+  { id: 'mens-multi-layer-leather-bracelet-with-vintage-beads-magnetic-buckle', name: 'Mens Multi-Layer Leather Bracelet with Vintage Beads & Magnetic Buckle', category: 'Bracelets', price: 750.00, icon: 'fa-cubes', desc: 'Premium quality leather for long-term durability', image: '26.png' },
+  { id: 'colorful-charm-bracelet---1-pc-multicolor-alloy-accessory',
+   name: 'Colorful Charm Bracelet - 1 Pc Multicolor Alloy Accessory',
+    category: 'Bracelets', price: 1350.00, icon: 'fa-cubes',
+     desc: 'Style: Trendy, Floral, Aesthetic |Type: Tulip Charm Bracelet |Color Variants: Pink (Pink Tulip with Silver Base), Korean Style, Viral Fashion Accessory', image: '27.png' },
+  { id: 'elegant-stainless-steel-tulip-trending-braclet', name: 'Elegant Stainless Steel Tulip Trending Braclet', category: 'Bracelets', price: 1350.00, icon: 'fa-cubes', desc: 'Stainless Steel material', image: '28.png' },
+  { id: '1-pc-modern-design-gold-plated-crystal-kara-bracelet-3-to-10-year-girls', name: '1 Pc Modern Design Gold Plated Crystal Kara Bracelet 3 to 10 year girls', category: 'Bracelets', price: 599.00, icon: 'fa-cubes', desc: 'Material Alloy', image: '29.png' },
+  
+  { id: 'gold-plated-crystal-earrings-for-women-2-pcs', name: 'Gold Plated Crystal Earrings for Women 2 Pcs', category: 'Earrings', price: 667.00, icon: 'fa-cubes', desc: 'Modern design with golden alloy base and sparkling crystal stones', image: '31.png' },
+  { id: 'golden-lattice-jhumkas-with-red-crystals-for-women', name: 'Golden Lattice Jhumkas with Red Crystals for Women', category: 'Earrings', price: 777.00, icon: 'fa-cubes', desc: 'Made with premium quality alloy for durability', image: '32.png' },
+  { id: 'gold-plated-multicolor-crystal-jhumka-earrings-for-women', name: 'Gold Plated Multicolor Crystal Jhumka Earrings for Women', category: 'Earrings', price: 700.00, icon: 'fa-cubes', desc: 'Multicolor design with red crystal accents', image: '33.png' },
+  { id: 'green-jhumkas-earrings-with-pearl-drop-gold-plated', name: 'Green Jhumkas Earrings with Pearl Drop & Gold Plated', category: 'Earrings', price: 700.00, icon: 'fa-cubes', desc: 'Durable and resistant to tarnish for long-lasting beauty', image: '34.png' },
+  { id: 'women-funky-multicolor-crystal-jhumka-earrings-gold-plated', name: 'Women Funky Multicolor Crystal Jhumka Earrings Gold Plated', category: 'Earrings', price: 600.00, icon: 'fa-cubes', desc: 'Multicolor crystal stones for dazzling sparkle', image: '35.png' },
+  { id: 'funky-gold-plated-jhumka-earrings-for-women-multicolor', name: 'Funky Gold Plated Jhumka Earrings for Women Multicolor', category: 'Earrings', price: 700.00, icon: 'fa-cubes', desc: 'Durable alloy construction for everyday wear', image: '36.png' },
+  { id: 'golden-adjustable-floral-ring-for-women-wedding-party-wear', name: 'Golden Adjustable Floral Ring for Women Wedding Party Wear', category: 'Rings', price: 567.00, icon: 'fa-cubes', desc: 'Adjustable band for one-size-fits-most comfort', image: '37.png' },
+  { id: 'white-adjustable-ring-for-wedding-eid-wear', name: 'White Adjustable Ring for Wedding & Eid Wear', category: 'Rings', price: 550.00, icon: 'fa-cubes', desc: 'Adjustable size for any finger', image: '38.png' },
+  { id: 'heart-shaped-love-ring-zircon-female-fashion-jewelry', name: 'Heart-Shaped Love Ring Zircon Female Fashion Jewelry', category: 'Rings', price: 850.00, icon: 'fa-cubes', desc: 'Heart-shaped design with sparkling zircon stones', image: '39.png' },
+  { id: 'turtle-jewelry-set-turquoise-antiques-for-women', name: 'Turtle Jewelry Set Turquoise Antiques for Women', category: 'Necklaces', price: 1050.00, icon: 'fa-cubes', desc: 'Premium quality materials for long-lasting beauty', image: '40.png' },
+  { id: 'luxurious-rolex-mens-watch', name: 'Luxurious Rolex Mens Watch', category: 'Watches', price: 2599.00, icon: 'fa-cubes', desc: 'Luxurious Rolex Mens Watch', image: '41.png' },
+  { id: 'pink-carbon-fiber-womens-watch-with-butterfly-lock', name: 'Pink Carbon Fiber Womens Watch with Butterfly Lock', category: 'Watches', price: 800.00, icon: 'fa-cubes', desc: 'Premium quality carbon fiber body for durability', image: '42.png' },
+  { id: 'carbon-fiber-watch-black-arabic-dial-40g-lightweight', name: 'Carbon Fiber Watch Black Arabic Dial 40g Lightweight', category: 'Watches', price: 1200.00, icon: 'fa-cubes', desc: 'Made from premium carbon fiber for unmatched durability', image: '43.png' },
+  { id: 'jeep-leather-wallet-slim-zipper-wrist-strap-brown-black', name: 'Jeep Leather Wallet Slim Zipper Wrist Strap Brown Black', category: 'Wallets', price: 900.00, icon: 'fa-cubes', desc: 'Premium Quality leather construction for long-lasting use', image: '44.png' },
+  { id: 'mens-zipper-wallet-brown-black-leather-m-logo', name: 'Mens Zipper Wallet Brown Black Leather M Logo', category: 'Wallets', price: 900.00, icon: 'fa-cubes', desc: 'Premium quality leather construction for long-term use', image: '45.png' },
+  { id: 'premium-mens-bifold-wallet-with-snap-closure', name: 'Premium Men’s Bifold Wallet with Snap Closure', category: 'Wallets', price: 850.00, icon: 'fa-cubes', desc: 'There might be slight color differences as a result of varying lighting and monitor effects.', image: '46.png' },
+  { id: 'premium-leather-wallet-with-bird-design-black-brown', name: 'Premium Leather Wallet with Bird Design Black Brown', category: 'Wallets', price: 750.00, icon: 'fa-cubes', desc: 'Premium quality leather for long-lasting durability', image: '47.png' },
+  { id: 'stainless-steel-spinning-watch-black-red', name: 'Stainless Steel Spinning Watch Black Red', category: 'Watches', price: 2100.00, icon: 'fa-cubes', desc: 'Best price in Pakistan for exceptional value', image: '48.png' },
+  
+
+
+
+
+
+
+];
+
+
+var cart = [];
+var activeProduct = null; // Explicitly declared
+
+try {
+  var stored = localStorage.getItem('subzero_cart');
+  if (stored) {
+    cart = JSON.parse(stored);
+  }
+} catch (e) {
+  cart = [];
+}
+
+function saveCart() {
+  localStorage.setItem('subzero_cart', JSON.stringify(cart));
+  updateCartUI();
+}
+
+function addToCart(product) {
+  var existing = null;
+  for (var i = 0; i < cart.length; i++) {
+    if (cart[i].id === product.id) {
+      existing = cart[i];
+      break;
+    }
+  }
+
+  if (existing) {
+    existing.qty = (parseInt(existing.qty) || 0) + 1;
+  } else {
+    cart.push({
+      id: product.id,
+      name: product.name,
+      category: product.category,
+      price: parseFloat(product.price) || 0,
+      icon: product.icon,
+      image: product.image,
+      qty: 1
+    });
+  }
+  saveCart();
+  toggleCart(true);
+}
+
+function updateQty(id, delta) {
+  for (var i = 0; i < cart.length; i++) {
+    if (cart[i].id === id || !cart[i].id) {
+      cart[i].qty = (parseInt(cart[i].qty) || 0) + delta;
+      if (cart[i].qty <= 0 || !cart[i].id) {
+        cart.splice(i, 1);
+        i--;
+      }
+      break;
+    }
+  }
+  saveCart();
+}
+
+function updateCartUI() {
+  var container = document.getElementById('cart-items-container');
+  var badge = document.getElementById('cart-badge');
+  var subtotalEl = document.getElementById('cart-subtotal');
+  
+  var totalCount = 0;
+  var subtotal = 0;
+
+  for (var i = 0; i < cart.length; i++) {
+    var itemQty = parseInt(cart[i].qty) || 0;
+    var itemPrice = parseFloat(cart[i].price) || 0;
+
+    totalCount += itemQty;
+    subtotal += (itemPrice * itemQty);
+  }
+  
+  badge.innerText = totalCount;
+  subtotalEl.innerText = 'Rs. ' + subtotal.toLocaleString(); // Updated to Rs.
+
+  if (cart.length === 0) {
+    container.innerHTML = '<p class="text-center text-xs text-[var(--ink-muted)] f-mono uppercase mt-8">Cart manifest empty.</p>';
+    return;
+  }
+
+  var html = '';
+  for (var j = 0; j < cart.length; j++) {
+    var c = cart[j];
+    var p = parseFloat(c.price) || 0;
+    var q = parseInt(c.qty) || 0;
+
+    // Render image thumbnail inside drawer if available
+    var imgHTML = c.image 
+      ? '<img src="' + c.image + '" alt="' + c.name + '" class="w-full h-full object-cover">'
+      : '<i class="fa-solid ' + c.icon + '"></i>';
+
+    html += '<div class="flex items-center gap-3 p-3 bg-[var(--bg-surface)] border border-[var(--border)]">' +
+      '<div class="w-10 h-10 bg-[var(--bg-subtle)] border border-[var(--border)] flex items-center justify-center text-sm overflow-hidden shrink-0">' +
+        imgHTML +
+      '</div>' +
+      '<div class="flex-1 min-w-0">' +
+        '<h4 class="f-display text-sm uppercase truncate">' + c.name + '</h4>' +
+        '<p class="f-mono text-xs text-[var(--accent)] font-bold">Rs. ' + p.toLocaleString() + '</p>' +
+      '</div>' +
+      '<div class="flex items-center border border-[var(--border)] bg-[var(--bg-main)]">' +
+        '<button onclick="updateQty(\'' + c.id + '\', -1)" class="px-2 py-0.5 text-xs">-</button>' +
+        '<span class="px-2 f-mono text-xs font-bold">' + q + '</span>' +
+        '<button onclick="updateQty(\'' + c.id + '\', 1)" class="px-2 py-0.5 text-xs">+</button>' +
+      '</div>' +
+    '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function toggleCart(open) {
+  var drawer = document.getElementById('cart-drawer');
+  var overlay = document.getElementById('cart-overlay');
+  if (open) {
+    drawer.classList.add('open');
+    overlay.style.display = 'block';
+  } else {
+    drawer.classList.remove('open');
+    overlay.style.display = 'none';
+  }
+}
+
+function renderProducts() {
+  var grid = document.getElementById('product-grid');
+  var html = '';
+
+  for (var i = 0; i < PRODUCTS.length; i++) {
+    var p = PRODUCTS[i];
+    html += '<div class="product-card p-4 rounded flex flex-col justify-between" onclick="openModal(\'' + p.id + '\')">' +
+      '<div>' +
+        '<div class="aspect-square bg-[var(--bg-subtle)] flex items-center justify-center mb-4 overflow-hidden rounded">' +
+          '<img src="' + p.image + '" alt="' + p.name + '" class="w-full h-full object-cover">' +
+        '</div>' +
+        '<span class="f-mono text-[10px] text-[var(--accent)] uppercase font-bold tracking-wider">' + p.category + '</span>' +
+        '<h3 class="f-display text-xl uppercase mt-1">' + p.name + '</h3>' +
+        '<p class="text-xs text-[var(--ink-muted)] my-2">' + p.desc + '</p>' +
+      '</div>' +
+      '<div class="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3">' +
+        '<span class="f-mono font-bold text-sm">Rs. ' + p.price.toLocaleString() + '</span>' +
+        '<span class="btn-buy px-3 py-1.5 text-xs f-mono font-bold uppercase tracking-wider">Inspect</span>' +
+      '</div>' +
+    '</div>';
+  }
+  grid.innerHTML = html;
+}
+
+function openModal(id) {
+  for (var i = 0; i < PRODUCTS.length; i++) {
+    if (PRODUCTS[i].id === id) {
+      activeProduct = PRODUCTS[i];
+      break;
+    }
+  }
+  if (!activeProduct) return;
+
+  document.getElementById('modal-product-name').innerText = activeProduct.name;
+  document.getElementById('modal-product-price').innerText = 'Rs. ' + activeProduct.price.toLocaleString();
+  document.getElementById('modal-product-desc').innerText = activeProduct.desc;
+  document.getElementById('modal-category-badge').innerText = activeProduct.category;
+  document.getElementById('modal-product-img').src = activeProduct.image;
+
+  document.getElementById('product-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('product-modal').classList.add('hidden');
+}
+
+document.getElementById('modal-add-cart').addEventListener('click', function() {
+  if (activeProduct) {
+    addToCart(activeProduct);
+    closeModal();
+  }
+});
+
+document.getElementById('modal-buy-now').addEventListener('click', function() {
+  if (activeProduct) {
+    addToCart(activeProduct);
+    window.location.href = 'checkout.html';
+  }
+});
+
+window.onload = function() {
+  renderProducts();
+  updateCartUI();
+};
+</script>
+</body>
+</html>
