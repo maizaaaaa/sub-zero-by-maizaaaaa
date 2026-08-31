@@ -548,20 +548,6 @@ function renderGrid(itemsToDisplay) {
 `).join('');
 }
 
-// Live Search Handler
-function handleSearch() {
-  const input = document.getElementById('search-input');
-  if (!input) return;
-
-  const query = input.value.toLowerCase().trim();
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(query) || 
-    p.sku.toLowerCase().includes(query)
-  );
-
-  renderGrid(filteredProducts);
-}
-
 // Render all items initially
 renderGrid(products);
 
@@ -948,10 +934,6 @@ window.addEventListener("load", () => {
 if (error) {
   console.error("Location save failed:", error);
 }
-
-          if (!response.ok) {
-            throw new Error(`Worker returned HTTP ${response.status}`);
-          }
 
           showToast("Thanks — you're all set.");
         } catch (error) {
