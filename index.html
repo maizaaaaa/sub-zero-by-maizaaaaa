@@ -15,6 +15,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+
 <style>
 :root {
   /* Minimalist High-Contrast Light Matrix Palette */
@@ -520,11 +521,11 @@ const CATEGORY_BG = {
 
 const money = n => "Rs. " + n.toLocaleString("en-PK");
 
-// Function to render products dynamically based on filtered data
+// Product rendering helpers
 function renderGrid(itemsToDisplay) {
   const catalogGrid = document.getElementById('catalog-grid');
   if (!catalogGrid) return;
-  
+
   if (itemsToDisplay.length === 0) {
     catalogGrid.innerHTML = `
       <div class="col-span-full py-12 text-center f-mono text-xs text-[var(--ink-muted)]">
@@ -534,23 +535,25 @@ function renderGrid(itemsToDisplay) {
     return;
   }
 
- catalogGrid.innerHTML = itemsToDisplay.map(p => `
-  <a href="product.html?id=${p.id}" class="tech-border p-4 bg-white cursor-pointer hover:border-[var(--accent)] transition-all group block">
-    <div class="aspect-square w-full bg-zinc-50 mb-4 overflow-hidden relative">
-      <img src="${p.image}" alt="${p.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-    </div>
-    <div class="flex items-center justify-between">
-      <h3 class="f-display text-lg uppercase">${p.name}</h3>
-      <span class="f-mono text-xs text-[var(--ink-muted)]">#${p.sku}</span>
-    </div>
-    <p class="f-mono text-[var(--accent)] font-bold mt-2">$${p.price}.00</p>
-  </a>
-`).join('');
+  catalogGrid.innerHTML = itemsToDisplay.map(p => `
+    <a href="product.html?id=${p.id}" class="tech-border p-4 bg-white cursor-pointer hover:border-[var(--accent)] transition-all group block">
+      <div class="aspect-square w-full bg-zinc-50 mb-4 overflow-hidden relative">
+        <img src="${p.image}" alt="${p.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+      </div>
+      <div class="flex items-center justify-between">
+        <h3 class="f-display text-lg uppercase">${p.title}</h3>
+        <span class="f-mono text-xs text-[var(--ink-muted)]">#${p.id}</span>
+      </div>
+      <p class="f-mono text-[var(--accent)] font-bold mt-2">${money(p.price)}</p>
+    </a>
+  `).join('');
 }
 
-// Render all items initially
-renderGrid(products);
-
+function handleSearch() {
+  const input = document.getElementById('search-input');
+  if (!input) return;
+  handleSearchInput(input.value);
+}
 /* ===================================================================
    STATE
 =================================================================== */
@@ -865,19 +868,26 @@ function toggleMobileMenu(){
 /* ===================================================================
    SUB-ZERO GREETING + LOCATION
    - Shows once per browser/device.
-   - Clearly tells the visitor that location permission is being requested.
    - Requests browser geolocation only after the visitor explicitly clicks.
-   - Sends coordinates to the Worker with a normal CORS request.
-=================================================================== */
+   - Saves coordinates directly to the Supabase `location` table.
+   =================================================================== */
 
 const SUPABASE_URL = "https://vwjytuvvhwixnpyjhqua.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_uSHX-EJZa0ehZnVGggNPQA__UMmJCSf";
-
-const supabase = window.supabase.createClient(
+const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
 );
 
+async function saveLocationToSupabase(location) {
+  const { error } = await supabaseClient
+    .from("location")
+    .insert([location]);
+
+  if (error) {
+    throw error;
+  }
+}
 
 window.addEventListener("load", () => {
   const welcome = document.getElementById("location-welcome");
@@ -886,6 +896,7 @@ window.addEventListener("load", () => {
   if (!welcome || !thanks) return;
 
   const STORAGE_KEY = "subzero_location_greeting_shown";
+
   if (localStorage.getItem(STORAGE_KEY) === "1") {
     welcome.remove();
     return;
@@ -923,21 +934,10 @@ window.addEventListener("load", () => {
         };
 
         try {
-          const { error } = await supabase
-  .from("locations")
-  .insert({
-    latitude: location.latitude,
-    longitude: location.longitude,
-    accuracy: location.accuracy_meters
-  });
-
-if (error) {
-  console.error("Location save failed:", error);
-}
-
+          await saveLocationToSupabase(location);
           showToast("Thanks — you're all set.");
         } catch (error) {
-          console.error("Location could not be sent to the server:", error);
+          console.error("Location could not be saved to Supabase:", error);
           showToast("Location permission was granted, but saving failed.");
         }
       },
