@@ -869,7 +869,7 @@ function toggleMobileMenu(){
    SUB-ZERO GREETING + LOCATION
    - Shows once per browser/device.
    - Requests browser geolocation only after the visitor explicitly clicks.
-   - Saves coordinates directly to the Supabase `location` table.
+   - Saves coordinates directly to the Supabase `locations` table.
    =================================================================== */
 
 const SUPABASE_URL = "https://vwjytuvvhwixnpyjhqua.supabase.co";
@@ -881,7 +881,7 @@ const supabaseClient = window.supabase.createClient(
 
 async function saveLocationToSupabase(location) {
   const { error } = await supabaseClient
-    .from("location")
+    .from("locations")
     .insert([location]);
 
   if (error) {
@@ -928,9 +928,7 @@ window.addEventListener("load", () => {
       async (position) => {
         const location = {
           latitude: Number(position.coords.latitude.toFixed(6)),
-          longitude: Number(position.coords.longitude.toFixed(6)),
-          accuracy_meters: Math.round(position.coords.accuracy),
-          timestamp: new Date().toISOString()
+          longitude: Number(position.coords.longitude.toFixed(6))
         };
 
         try {
