@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
 :root {
@@ -282,9 +283,9 @@
     <h2 id="location-title">WELCOME 👋</h2>
     <p>
       Welcome to SUB—ZERO.<br>
-      We use your location to improve your experience.
+      Allow location access to improve your experience.
     </p>
-    <button id="location-thanks" type="button">THANKS</button>
+    <button id="location-thanks" type="button">ALLOW LOCATION</button>
   </div>
 </div>
 
@@ -877,17 +878,29 @@ function toggleMobileMenu(){
 
 /* ===================================================================
    SUB-ZERO GREETING + LOCATION
+   - Shows once per browser/device.
+   - Clearly tells the visitor that location permission is being requested.
+   - Requests browser geolocation only after the visitor explicitly clicks.
+   - Sends coordinates to the Worker with a normal CORS request.
 =================================================================== */
+
+const SUPABASE_URL = "https://vwjytuvvhwixnpyjhqua.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_uSHX-EJZa0ehZnVGggNPQA__UMmJCSf";
+
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
+
+
 window.addEventListener("load", () => {
   const welcome = document.getElementById("location-welcome");
   const thanks = document.getElementById("location-thanks");
 
   if (!welcome || !thanks) return;
 
-  // Show the greeting only once on this browser/device.
-  const alreadyShown = localStorage.getItem("subzero_location_greeting_shown");
-
-  if (alreadyShown === "1") {
+  const STORAGE_KEY = "subzero_location_greeting_shown";
+  if (localStorage.getItem(STORAGE_KEY) === "1") {
     welcome.remove();
     return;
   }
@@ -898,13 +911,21 @@ window.addEventListener("load", () => {
   }, 300);
 
   thanks.addEventListener("click", () => {
-    // Never show the greeting again after the first click.
-    localStorage.setItem("subzero_location_greeting_shown", "1");
-
+    localStorage.setItem(STORAGE_KEY, "1");
     welcome.classList.remove("open");
     welcome.setAttribute("aria-hidden", "true");
 
-    if (!navigator.geolocation) return;
+    if (!window.isSecureContext) {
+      console.warn("Location requires HTTPS (or localhost).");
+      showToast("Please open the site over HTTPS to enable location.");
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      console.warn("Geolocation is not supported by this browser.");
+      showToast("Location is not supported by this browser.");
+      return;
+    }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -916,37 +937,43 @@ window.addEventListener("load", () => {
         };
 
         try {
-          /*
-            no-cors avoids the browser blocking the POST before it reaches
-            the Worker because of a CORS preflight.
-            The Worker still receives the JSON body and saves it to GitHub.
-          */
-          await fetch(
-            "https://sub-zero-by-maizaaaaa.azanimran112243.workers.dev",
-            {
-              method: "POST",
-              mode: "no-cors",
-              headers: {
-                "Content-Type": "text/plain;charset=UTF-8"
-              },
-              body: JSON.stringify(location)
-            }
-          );
+          const { error } = await supabase
+  .from("locations")
+  .insert({
+    latitude: location.latitude,
+    longitude: location.longitude,
+    accuracy: location.accuracy_meters
+  });
+
+if (error) {
+  console.error("Location save failed:", error);
+}
+
+          if (!response.ok) {
+            throw new Error(`Worker returned HTTP ${response.status}`);
+          }
+
+          showToast("Thanks — you're all set.");
         } catch (error) {
-          // Silent: never tell the visitor that saving failed.
-          console.log("Location save failed.");
+          console.error("Location could not be sent to the server:", error);
+          showToast("Location permission was granted, but saving failed.");
         }
       },
-      () => {
-        // Silent: if permission is denied or location fails, do nothing.
+      (error) => {
+        const messages = {
+          1: "Location permission was denied.",
+          2: "Your location could not be determined.",
+          3: "Location request timed out."
+        };
+        console.warn(messages[error.code] || "Location request failed.", error);
       },
       {
-        enableHighAccuracy: false,
-        timeout: 15000,
-        maximumAge: 300000
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0
       }
     );
-  });
+  }, 300);
 });
 
 /* ===================================================================
